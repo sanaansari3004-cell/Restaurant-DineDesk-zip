@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cream: #faf5ec;
+  --espresso: #2b1d14;
+  --ember: #c2410c;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--cream);
+  color: var(--espresso);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* thin editorial rules */
+.rule-double {
+  border-top: 3px double rgba(43, 29, 20, 0.25);
+}
+
+/* subtle paper texture via layered gradients */
+.paper {
+  background-image:
+    radial-gradient(ellipse at 20% 10%, rgba(194, 65, 12, 0.05), transparent 55%),
+    radial-gradient(ellipse at 85% 90%, rgba(43, 29, 20, 0.06), transparent 50%);
+}
+
+::selection {
+  background: #c2410c;
+  color: #faf5ec;
+}

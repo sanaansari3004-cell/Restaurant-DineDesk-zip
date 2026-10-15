@@ -1,0 +1,160 @@
+// DineDesk — Restaurant Ordering Platform
+// Database: PostgreSQL 15+ (see docker-compose.yml)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  KITCHEN
+}
+
+enum OrderStatus {
+  RECEIVED
+  PREPARING
+  READY
+  SERVED
+  CANCELLED
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+}
+
+// Payment is SIMULATED in demo mode — always succeeds, no real money moves.
+// The single value below exists so the code and README stay honest.
+enum PaymentStatus {
+  DEMO_PAID
+}
+
+enum ReservationStatus {
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+}
+
+// ---- Staff accounts (admin + kitchen). Customers order as guest or with a
+// ---- lightweight customer profile; only staff need passwords.
+model StaffUser {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String   // bcrypt hash
+  role      Role
+  createdAt DateTime @default(now())
+
+  @@map("staff_users")
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  createdAt DateTime @default(now())
+  orders    Order[]
+
+  @@map("customers")
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  slug      String     @unique
+  sortOrder Int        @default(0)
+  items     MenuItem[]
+
+  @@map("categories")
+}
+
+model MenuItem {
+  id          String     @id @default(cuid())
+  name        String
+  description String     @db.Text
+  pricePaise  Int        // INR price stored in paise (₹249.00 -> 24900)
+  veg         Boolean    @default(true)
+  spicy       Int        @default(0) // 0 = none, 1 = mild, 2 = medium, 3 = hot
+  available   Boolean    @default(true)
+  isSpecial   Boolean    @default(false)
+  categoryId  String
+  category    Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  orderItems  OrderItem[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("menu_items")
+}
+
+model DiningTable {
+  id           String        @id @default(cuid())
+  number       Int           @unique
+  seats        Int
+  zone         String        @default("Main Hall")
+  active       Boolean       @default(true)
+  reservations Reservation[]
+  orders       Order[]
+
+  @@map("dining_tables")
+}
+
+model Reservation {
+  id          String            @id @default(cuid())
+  name        String
+  phone       String
+  date        DateTime          @db.Date // reservation day (date only)
+  slot        String            // "12:30", "19:00", ... from SLOT list
+  partySize   Int
+  tableId     String
+  table       DiningTable       @relation(fields: [tableId], references: [id])
+  status      ReservationStatus @default(CONFIRMED)
+  notes       String?           @db.Text
+  createdAt   DateTime          @default(now())
+
+  // Hard no-double-booking rule: one table, one date, one slot.
+  @@unique([tableId, date, slot])
+  @@map("reservations")
+}
+
+model Order {
+  id            String        @id @default(cuid())
+  orderNo       String        @unique // human friendly: DD-XXXXXX
+  customerId    String?
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+  customerName  String
+  phone         String?
+  type          OrderType     @default(DINE_IN)
+  tableId       String?
+  table         DiningTable?  @relation(fields: [tableId], references: [id])
+  status        OrderStatus   @default(RECEIVED)
+  paymentStatus PaymentStatus @default(DEMO_PAID)
+  paymentMethod String        @default("DEMO") // always DEMO — simulated payment
+  subtotalPaise Int
+  taxPaise      Int           // 5% GST baked in at checkout
+  totalPaise    Int
+  items         OrderItem[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  name       String   // price/name snapshot at order time
+  pricePaise Int
+  qty        Int
+
+  @@map("order_items")
+}
